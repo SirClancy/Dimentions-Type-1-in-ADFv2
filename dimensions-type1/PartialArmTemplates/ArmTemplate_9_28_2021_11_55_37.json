@@ -1,0 +1,182 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "dimensions-type1"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/SCD TYPE 1')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "1.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "dataflow1",
+								"type": "DataFlowReference"
+							},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/dataflow1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DIMSalesRep_AzureSQLDB')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DIMSalesRep_linkedservice",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "SalesRep_Key",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "SalesRep_Number",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "SalesRep_Name",
+						"type": "varchar"
+					},
+					{
+						"name": "SalesRep_Department",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "Dim_SalesRep"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/STGSalesRepAzureSQLDB')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "STGSalesRepAzureLinkedService",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "SalesRep_Number",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "SalesRep_Name",
+						"type": "varchar"
+					},
+					{
+						"name": "SalesRep_Department",
+						"type": "varchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "STG_Sales_Rep"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dataflow1')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "STGSalesRepAzureSQLDB",
+								"type": "DatasetReference"
+							},
+							"name": "SalesRepSTG"
+						},
+						{
+							"dataset": {
+								"referenceName": "DIMSalesRep_AzureSQLDB",
+								"type": "DatasetReference"
+							},
+							"name": "DimSalesRepSCD1"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DIMSalesRep_AzureSQLDB",
+								"type": "DatasetReference"
+							},
+							"name": "sink1"
+						},
+						{
+							"dataset": {
+								"referenceName": "DIMSalesRep_AzureSQLDB",
+								"type": "DatasetReference"
+							},
+							"name": "sink2"
+						}
+					],
+					"transformations": [
+						{
+							"name": "Exists1"
+						},
+						{
+							"name": "Exists2"
+						},
+						{
+							"name": "AlterRow1"
+						}
+					],
+					"script": "source(output(\n\t\tSalesRep_Number as integer,\n\t\tSalesRep_Name as string,\n\t\tSalesRep_Department as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> SalesRepSTG\nsource(output(\n\t\tSalesRep_Key as integer,\n\t\tSalesRep_Number as integer,\n\t\tSalesRep_Name as string,\n\t\tSalesRep_Department as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> DimSalesRepSCD1\nSalesRepSTG, DimSalesRepSCD1 exists(SalesRepSTG@SalesRep_Number == DimSalesRepSCD1@SalesRep_Number,\n\tnegate:false,\n\tbroadcast: 'auto')~> Exists1\nSalesRepSTG, DimSalesRepSCD1 exists(SalesRepSTG@SalesRep_Number == DimSalesRepSCD1@SalesRep_Number,\n\tnegate:false,\n\tbroadcast: 'auto')~> Exists2\nExists1 alterRow(updateIf(true())) ~> AlterRow1\nExists2 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tSalesRep_Key as integer,\n\t\tSalesRep_Number as integer,\n\t\tSalesRep_Name as string,\n\t\tSalesRep_Department as string\n\t),\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> sink1\nAlterRow1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tSalesRep_Key as integer,\n\t\tSalesRep_Number as integer,\n\t\tSalesRep_Name as string,\n\t\tSalesRep_Department as string\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:true,\n\tupsertable:false,\n\tkeys:['SalesRep_Number'],\n\tformat: 'table',\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> sink2"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/STGSalesRepAzureSQLDB')]",
+				"[concat(variables('factoryId'), '/datasets/DIMSalesRep_AzureSQLDB')]"
+			]
+		}
+	]
+}
