@@ -1,0 +1,35 @@
+{
+	"name": "DIMSalesRep_AzureSQLDB",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DIMSalesRep_linkedservice",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "SalesRep_Key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "SalesRep_Number",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "SalesRep_Name",
+				"type": "varchar"
+			},
+			{
+				"name": "SalesRep_Department",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Dim_SalesRep"
+		}
+	}
+}

@@ -1,0 +1,30 @@
+{
+	"name": "STGSalesRepAzureSQLDB",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "STGSalesRepAzureLinkedService",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "SalesRep_Number",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "SalesRep_Name",
+				"type": "varchar"
+			},
+			{
+				"name": "SalesRep_Department",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "STG_Sales_Rep"
+		}
+	}
+}
